@@ -554,13 +554,19 @@ class FXAnalysisEngine:
             # 9. ディレクトリ作成とファイル移動
             created_dir = self.create_directory_and_move_files(base_date, report1_file, report2_file)
             
+            # 10. 出力ファイルを整理
+            self.organize_output_files(base_date, output_file)
+            
+            # 11. 整理後の出力ファイルパスを更新
+            output_file_path = os.path.join(created_dir, os.path.basename(output_file))
+            
             return {
                 'success': True,
                 'base_date': base_date,
                 'report1_file': report1_file,
                 'report2_file': report2_file,
                 'created_directory': created_dir,
-                'output_file': output_file,
+                'output_file': output_file_path,
                 'day_results': day_results,
                 'weekly_summary': self.calculate_weekly_summary(day_results),
                 'formatted_output': formatted_results,
@@ -616,6 +622,53 @@ class FXAnalysisEngine:
             logger.error(traceback.format_exc())
             raise
 
+    def organize_output_files(self, base_date: str, output_file: str) -> None:
+        """
+        出力ファイルを整理
+        
+        Args:
+            base_date: 基準日
+            output_file: 出力ファイルパス
+        """
+        directory = base_date
+        
+        # 出力ファイルが基準日ディレクトリにない場合は移動
+        logger.info(f"出力ファイルの整理を開始: {output_file}")
+        
+        if not output_file.startswith(directory):
+            filename = os.path.basename(output_file)
+            new_path = os.path.join(directory, filename)
+            
+            logger.info(f"出力ファイルを移動します: {output_file} -> {new_path}")
+            
+            # ファイルが既に存在する場合は上書き
+            if os.path.exists(new_path):
+                os.remove(new_path)
+                logger.info(f"既存の出力ファイルを削除しました: {new_path}")
+            
+            # 出力ファイルをコピーして元のファイルを削除
+            shutil.copy2(output_file, new_path)
+            logger.info(f"出力ファイルをコピーしました: {output_file} -> {new_path}")
+            os.remove(output_file)
+            logger.info(f"元の出力ファイルを削除しました: {output_file}")
+            
+            # 元のパスを更新
+            output_file = new_path
+        
+        # 古いtxtファイルを削除
+        txt_pattern = f"output_{base_date}.txt"
+        if os.path.exists(txt_pattern):
+            os.remove(txt_pattern)
+            logger.info(f"古いtxtファイルを削除しました: {txt_pattern}")
+        
+        # 基準日ディレクトリ内のtxtファイルも削除
+        txt_pattern = os.path.join(directory, f"output_{base_date}.txt")
+        if os.path.exists(txt_pattern):
+            os.remove(txt_pattern)
+            logger.info(f"古いtxtファイルを削除しました: {txt_pattern}")
+            
+        logger.info(f"出力ファイルの整理が完了しました")
+
 
 def main():
     """
@@ -625,6 +678,7 @@ def main():
         analyzer = FXAnalysisEngine()
         output_file = analyzer.main()
         print(f"分析完了。結果は {output_file} に保存されました。")
+        print("入力ファイルと出力ファイルは基準日のディレクトリに整理されました。")
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")
         traceback.print_exc()
